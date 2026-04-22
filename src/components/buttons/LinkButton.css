@@ -1,0 +1,34 @@
+.link-button{
+    text-decoration: none;
+    color: #fff;
+    width: fit-content;
+    height: 40px;
+    border-radius: 8px;
+    border: #20297c00 1px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #20297C;
+    font-size: 16px;
+    font-weight: 400;
+    padding: 0px 16px;
+}
+.second-link{
+    background-color: #fff;
+    color: #000000;
+    border: #20297C 1px solid; 
+}
+.link-button:hover{
+    cursor: pointer;
+    background-color: #fff;
+    color: #000000;
+    border: #20297C 1px solid;
+    transition: all 0.3s ease-in-out;
+}
+.second-link:hover{
+    cursor: pointer;
+    background-color: #20297C;
+    color: #fff;
+    border: #20297c00 1px solid;
+    transition: all 0.3s ease-in-out;
+}
