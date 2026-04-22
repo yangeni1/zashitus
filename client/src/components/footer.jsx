@@ -1,12 +1,13 @@
 // src/components/footer.jsx
 import styles from './footer.module.css'
+import logoNoFillUrl from '../assets/logo_no_fill.svg'
 
 function  Footer() {
     return (
         <footer>
             <div>
                 <a href="/"  className={styles.flex}>
-                    <img src="src/assets/logo_no_fill.svg" alt="logo" />
+                    <img src={logoNoFillUrl} alt="logo" />
                     <h1 className={styles.title}>ЗАЩИТУС</h1>
                 </a>
                 <div className={styles.contact}>

@@ -1,9 +1,9 @@
-// src/App.jsx
-import './App.css' 
-import Header from './components/header.jsx'
-import LinkButton from './components/buttons/LinkButton.jsx'
-import Footer from './components/footer.jsx'
-function App() {
+import '../App.css'
+import Header from '../components/header.jsx'
+import LinkButton from '../components/buttons/LinkButton.jsx'
+import Footer from '../components/footer.jsx'
+
+function HomePage() {
   return (
    <>
    <Header/>
@@ -11,8 +11,8 @@ function App() {
 
        <div className='container'>
         <div className='text_container'>
-          <h2>Пройдите чек-лист и проверьте безопасность своего аккаунта</h2>
-          <p>Это поможет защитить ваш аккаунт от взлома и настроить безопасность</p>
+          <h2>Пройдите чек-лист и проверьте безопасность своего аккаунта</h2>
+          <p>Это поможет защитить ваш аккаунт от взлома и настроить безопасность</p>
            <LinkButton href="/check" className='bigLink'>Пройти чек-лист</LinkButton>
         </div>
        </div>
@@ -57,28 +57,28 @@ function App() {
             <h3>Краткие рекодмендации</h3>
             <div className='flex_container_second'>
               <div className='item_flex_second'>
-                <p>Используйте сложные и уникальные пароли для каждого сервиса</p>
+                <p>Используйте сложные и уникальные пароли для каждого сервиса</p>
               </div>
               <div className='item_flex_second'>
                 <p>Включите двухфакторную аутентификацию (2FA)</p>
               </div>
               <div className='item_flex_second'>
-                <p>Не переходите по подозрительным ссылкам и сообщениям</p>
+                <p>Не переходите по подозрительным ссылкам и сообщениям</p>
               </div>
               <div className='item_flex_second'>
-                <p>Регулярно проверяйте активные сессии в аккаунтах</p>
+                <p>Регулярно проверяйте активные сессии в аккаунтах</p>
               </div>
               <div className='item_flex_second'>
-                <p>Не используйте один пароль для всех социальных сетей</p>
+                <p>Не используйте один пароль для всех социальных сетей</p>
               </div>
               <div className='item_flex_second'>
-                <p>Регулярно проверяйте активные сессии в аккаунтах</p>
+                <p>Регулярно проверяйте активные сессии в аккаунтах</p>
               </div>
               <div className='item_flex_second'>
-                <p>Обновляйте приложения и операционную систему</p>
+                <p>Обновляйте приложения и операционную систему</p>
               </div>
               <div className='item_flex_second'>
-                <p>Не вводите данные на сторонних или неизвестных сайтах</p>
+                <p>Не вводите данные на сторонних или неизвестных сайтах</p>
               </div>
             </div>
         </div>
@@ -101,4 +101,4 @@ function App() {
   )
 }
 
-export default App
+export default HomePage

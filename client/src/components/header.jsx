@@ -1,11 +1,13 @@
 // src/components/header.jsx
 import styles from './header.module.css'
 import LinkButton from './buttons/LinkButton.jsx'
+import logoUrl from '../assets/logo.svg'
+
 function  Header() {
     return (
         <header>
             <a href="/"  className={styles.flex}>
-            <img src="src/assets/logo.svg" alt="logo" />
+            <img src={logoUrl} alt="logo" />
             <h1 className={styles.title}>ЗАЩИТУС</h1>
             </a>
             <nav className={styles.flex_links}>
