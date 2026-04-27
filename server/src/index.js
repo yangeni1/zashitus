@@ -1,18 +1,41 @@
 import http from 'node:http'
+import { config } from './config.js'
+import { sendJson } from './http.js'
+import { closeRouterResources, handleRequest } from './router.js'
 
-const port = Number(process.env.PORT || 3000)
+const server = http.createServer(async (req, res) => {
+  try {
+    await handleRequest(req, res)
+  } catch (error) {
+    const statusCode = error.statusCode || 500
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/api/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ status: 'ok' }))
-    return
+    if (statusCode >= 500) {
+      console.error(error.code || 'UNEXPECTED_ERROR', error.message)
+    }
+
+    if (!res.headersSent) {
+      sendJson(res, statusCode, {
+        error: {
+          code: error.code || 'INTERNAL_ERROR',
+          message: statusCode >= 500 ? 'Internal server error' : error.message,
+        },
+      })
+    } else {
+      res.end()
+    }
   }
-
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
-  res.end(JSON.stringify({ error: 'Not found' }))
 })
 
-server.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`)
+server.listen(config.port, () => {
+  console.log(`Server listening on http://localhost:${config.port}`)
 })
+
+function shutdown() {
+  closeRouterResources()
+  server.close(() => {
+    process.exit(0)
+  })
+}
+
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
