@@ -27,7 +27,7 @@ function  Footer() {
                 <div className={styles.links}>
                     <h2>Безопасность</h2>
                     <a href="/check">Пройти чек-лист</a>
-                    <a href="/hack">Помощь при взломе</a>
+                    <a href="/hackme">Помощь при взломе</a>
                 </div>
             </div>
             

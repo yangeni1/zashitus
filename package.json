@@ -14,5 +14,8 @@
     "dev:server": "npm run dev -w server",
     "start:server": "npm run start -w server",
     "check:server": "npm run check -w server"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.14.2"
   }
 }
