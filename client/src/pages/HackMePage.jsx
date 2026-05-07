@@ -42,19 +42,19 @@ function HackMePage() {
             <div className='item_social'>
                 <h3>ВКонтакте</h3>
                 <img src="src/assets/VKLogo.png" alt="vklogo" />
-                <LinkButton href="/">Поддержка</LinkButton>
+                <LinkButton target="_blank" href="https://vk.com/support?act=home&source=dontpanic">Поддержка</LinkButton>
             </div>
 
             <div className='item_social'>
                 <h3>Телеграм</h3>
                 <img src="src/assets/telegramLogo.png" alt="telegramlogo" />
-                <LinkButton href="/">Поддержка</LinkButton>
+                <LinkButton target="_blank" href="https://telegram.org/support?setln=ru">Поддержка</LinkButton>
             </div>
 
             <div className='item_social'>
                 <h3>Одноклассники</h3>
                 <img src="src/assets/okLogo.png" alt="oklogo" />
-                <LinkButton href="/">Поддержка</LinkButton>
+                <LinkButton target="_blank" href="https://ok.ru/help/ask">Поддержка</LinkButton>
             </div>
         </div>
       </main>
