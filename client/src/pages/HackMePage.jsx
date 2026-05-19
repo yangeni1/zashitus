@@ -2,6 +2,11 @@ import '../App.css'
 import Header from '../components/header.jsx'
 import LinkButton from '../components/buttons/LinkButton.jsx'
 import Footer from '../components/footer.jsx'
+
+import VKLogo from '../assets/VKLogo.png'
+import telegramLogo from '../assets/telegramLogo.png'
+import okLogo from '../assets/okLogo.png'
+
 function HackMePage() {
   return (
    <>
@@ -41,19 +46,19 @@ function HackMePage() {
         <div className='container_social'>
             <div className='item_social'>
                 <h3>ВКонтакте</h3>
-                <img src="src/assets/VKLogo.png" alt="vklogo" />
+                <img src={VKLogo} alt="vklogo" />
                 <LinkButton target="_blank" href="https://vk.com/support?act=home&source=dontpanic">Поддержка</LinkButton>
             </div>
 
             <div className='item_social'>
                 <h3>Телеграм</h3>
-                <img src="src/assets/telegramLogo.png" alt="telegramlogo" />
+                <img src={telegramLogo} alt="telegramlogo" />
                 <LinkButton target="_blank" href="https://telegram.org/support?setln=ru">Поддержка</LinkButton>
             </div>
 
             <div className='item_social'>
                 <h3>Одноклассники</h3>
-                <img src="src/assets/okLogo.png" alt="oklogo" />
+                <img src={okLogo} alt="oklogo" />
                 <LinkButton target="_blank" href="https://ok.ru/help/ask">Поддержка</LinkButton>
             </div>
         </div>
