@@ -3,6 +3,10 @@ import { config } from './config.js'
 import { sendJson } from './http.js'
 import { closeRouterResources, handleRequest } from './router.js'
 
+console.log("Starting Zashitus Server...");
+console.log("CWD:", process.cwd());
+console.log("Port:", config.port);
+
 const server = http.createServer(async (req, res) => {
   try {
     await handleRequest(req, res)
@@ -10,7 +14,8 @@ const server = http.createServer(async (req, res) => {
     const statusCode = error.statusCode || 500
 
     if (statusCode >= 500) {
-      console.error(error.code || 'UNEXPECTED_ERROR', error.message)
+      console.error(error.code || 'UNEXPECTED_ERROR', error.message);
+      if (error.stack) console.error(error.stack);
     }
 
     if (!res.headersSent) {
@@ -26,11 +31,21 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`Error: Port ${config.port} is already in use.`);
+  } else {
+    console.error("Server error:", e);
+  }
+  process.exit(1);
+});
+
 server.listen(config.port, () => {
   console.log(`Server listening on http://localhost:${config.port}`)
 })
 
 function shutdown() {
+  console.log("Shutting down...");
   closeRouterResources()
   server.close(() => {
     process.exit(0)
