@@ -5,6 +5,10 @@
 
 set -e
 
+# Настройка неинтерактивного режима для пакетных менеджеров
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+
 # Цвета для вывода
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -21,8 +25,9 @@ install_dependencies() {
     # Пытаемся определить систему
     if command -v apt-get >/dev/null 2>&1; then
         echo "Настройка репозитория NodeSource для Node.js 20..."
+        # Используем -E чтобы сохранить переменные окружения DEBIAN_FRONTEND
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-        sudo apt-get install -y -qq nodejs git curl
+        sudo -E apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" nodejs git curl
     elif command -v yum >/dev/null 2>&1; then
         echo "Настройка репозитория NodeSource для Node.js 20..."
         curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
@@ -79,6 +84,7 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
 
     if [ -t 0 ] || [ -c /dev/tty ]; then
         echo -e "${BLUE}Хотите попытаться установить/обновить их автоматически? (y/n)${NC}"
+        # Читаем из терминала напрямую
         read -p "> " confirm < /dev/tty || confirm="n"
         
         if [[ "$confirm" =~ ^[yY] ]]; then
