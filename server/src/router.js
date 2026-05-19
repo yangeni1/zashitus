@@ -10,11 +10,8 @@ import { PasswordCheckService, validatePasswordInput } from './services/password
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-// Корнем сервера считаем папку, где лежит package.json сервера (на один уровень выше src)
 const SERVER_ROOT = resolve(__dirname, '..')
-// Корнем проекта считаем папку, где лежит общий package.json (на один уровень выше server)
 const PROJECT_ROOT = resolve(SERVER_ROOT, '..')
-// Путь к собранному фронтенду
 const DIST_PATH = resolve(PROJECT_ROOT, 'client/dist')
 
 console.log(`[Router] Initialized. Project Root: ${PROJECT_ROOT}`);
@@ -42,10 +39,18 @@ let resources
 
 export async function handleRequest(req, res) {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+  
+  // Логируем каждый запрос для диагностики
+  console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
 
   // API Routes
-  if (req.method === 'GET' && url.pathname === '/api/health') {
-    sendJson(res, 200, { status: 'ok' })
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/api/health') {
+    if (req.method === 'HEAD') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end()
+    } else {
+        sendJson(res, 200, { status: 'ok' })
+    }
     return
   }
 
@@ -55,7 +60,8 @@ export async function handleRequest(req, res) {
   }
 
   // Static Files (Production)
-  if (req.method === 'GET') {
+  // Разрешаем и GET, и HEAD (для curl -I)
+  if (req.method === 'GET' || req.method === 'HEAD') {
     const normalizedPath = url.pathname.replace(/^(\.\.[\/\\])+/, '')
     let filePath = join(DIST_PATH, normalizedPath === '/' ? 'index.html' : normalizedPath)
     
@@ -63,15 +69,15 @@ export async function handleRequest(req, res) {
     try {
       if (existsSync(filePath) && statSync(filePath).isFile()) {
         fileFound = true
-      } else {
-        // SPA Fallback: если файл не найден (например, при переходе по прямой ссылке в SPA), отдаем index.html
+      } else if (normalizedPath === '/' || !extname(normalizedPath)) {
+        // SPA Fallback: если запрашивают корень или путь без расширения (роут), отдаем index.html
         filePath = join(DIST_PATH, 'index.html')
         if (existsSync(filePath) && statSync(filePath).isFile()) {
           fileFound = true
         }
       }
     } catch (e) {
-      // Fall through
+      // Игнорируем ошибки доступа
     }
 
     if (fileFound) {
@@ -79,17 +85,32 @@ export async function handleRequest(req, res) {
       const contentType = MIME_TYPES[ext] || 'application/octet-stream'
       
       try {
-        const content = readFileSync(filePath)
-        res.writeHead(200, { 'Content-Type': contentType })
-        res.end(content)
+        if (req.method === 'HEAD') {
+          res.writeHead(200, { 'Content-Type': contentType })
+          res.end()
+        } else {
+          const content = readFileSync(filePath)
+          res.writeHead(200, { 'Content-Type': contentType })
+          res.end(content)
+        }
         return
       } catch (e) {
-        console.error(`[Router] Error reading file ${filePath}:`, e)
+        console.error(`[Router] Error handling static file ${filePath}:`, e)
       }
+    } else {
+       // Логируем промахи статики только если это не API
+       if (!url.pathname.startsWith('/api/')) {
+         console.warn(`[Router] File not found: ${url.pathname} (target: ${filePath})`)
+       }
     }
   }
 
-  sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } })
+  if (req.method === 'HEAD') {
+    res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end()
+  } else {
+    sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } })
+  }
 }
 
 async function handlePasswordCheck(req, res) {
