@@ -9,10 +9,13 @@ import { PasswordCheckService, validatePasswordInput } from './services/password
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+// В папке server/src/router.js, поэтому ../.. это server/
+// Нам нужно выйти в корень проекта, чтобы попасть в client/dist
 const PROJECT_ROOT = resolve(__dirname, '../..')
-const DIST_PATH = resolve(PROJECT_ROOT, 'client/dist')
+const DIST_PATH = resolve(PROJECT_ROOT, '../client/dist')
 
-console.log(`[Router] Static files path: ${DIST_PATH}`)
+console.log(`[Router] Initialized. Project Root: ${PROJECT_ROOT}`);
+console.log(`[Router] Static files path: ${DIST_PATH}`);
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -50,16 +53,15 @@ export async function handleRequest(req, res) {
 
   // Static Files (Production)
   if (req.method === 'GET') {
-    // Prevent directory traversal
     const normalizedPath = url.pathname.replace(/^(\.\.[\/\\])+/, '')
     let filePath = join(DIST_PATH, normalizedPath === '/' ? 'index.html' : normalizedPath)
     
-    // Check if file exists, if not serve index.html (SPA support)
     let fileFound = false
     try {
       if (existsSync(filePath) && statSync(filePath).isFile()) {
         fileFound = true
       } else {
+        // SPA Fallback: if not found, serve index.html
         filePath = join(DIST_PATH, 'index.html')
         if (existsSync(filePath) && statSync(filePath).isFile()) {
           fileFound = true
