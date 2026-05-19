@@ -52,11 +52,14 @@ fi
 
 if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     echo -e "\n${YELLOW}Отсутствуют необходимые компоненты: ${MISSING_DEPS[*]}${NC}"
-    read -p "Хотите установить их автоматически? (y/n): " confirm
+    # Используем /dev/tty для чтения ввода, так как stdin занят пайпом curl
+    echo -n "Хотите установить их автоматически? (y/n): "
+    read confirm < /dev/tty
+    
     if [[ "$confirm" == [yY] || "$confirm" == [yY][eE][sS] ]]; then
         install_dependencies
     else
-        echo -e "\n${RED}Установка прервана.${NC}"
+        echo -e "\n${RED}Установка прервана пользователем.${NC}"
         echo "Для работы Zashitus необходимы:"
         echo "1. Node.js v20 или выше (и npm)"
         echo "2. Git"
