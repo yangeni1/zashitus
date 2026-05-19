@@ -106,20 +106,42 @@ else
     INSTALL_DIR=$(pwd)
 fi
 
+# Настройка пути (Base Path)
+echo -e "\n${YELLOW}Настройка пути сайта:${NC}"
+echo "По какому пути будет доступен сайт? (например, /zashitus/)"
+echo "Если сайт будет в корне домена, просто нажмите Enter."
+read -p "> " BASE_PATH < /dev/tty || BASE_PATH="/"
+
+# Исправляем формат пути (должен начинаться и заканчиваться на /)
+if [[ -z "$BASE_PATH" || "$BASE_PATH" == "/" ]]; then
+    BASE_PATH="/"
+else
+    [[ "$BASE_PATH" != /* ]] && BASE_PATH="/$BASE_PATH"
+    [[ "$BASE_PATH" != */ ]] && BASE_PATH="$BASE_PATH/"
+fi
+
+echo -e "Сайт будет настроен на путь: ${GREEN}$BASE_PATH${NC}"
+
+# Записываем в .env файл (и для сервера, и для клиента)
+if [ ! -f "server/.env" ]; then
+    cp server/.env.example server/.env
+fi
+# Обновляем или добавляем VITE_BASE_PATH
+if grep -q "VITE_BASE_PATH" server/.env; then
+    sed -i "s|VITE_BASE_PATH=.*|VITE_BASE_PATH=$BASE_PATH|" server/.env
+else
+    echo "VITE_BASE_PATH=$BASE_PATH" >> server/.env
+fi
+
 # Установка зависимостей проекта
 echo "Установка npm-пакетов (это может занять время)..."
 npm install --silent
 
 # Сборка фронтенда
 echo "Сборка фронтенда..."
-npm run build:client --silent
-
-# Настройка .env
-if [ ! -f "server/.env" ]; then
-    echo "Создание конфигурации .env из примера..."
-    cp server/.env.example server/.env
-    echo -e "${GREEN}Файл server/.env создан.${NC}"
-fi
+# Vite подхватит VITE_BASE_PATH из server/.env так как мы в корне проекта
+# Но для надежности передадим через префикс
+VITE_BASE_PATH=$BASE_PATH npm run build:client --silent
 
 # Настройка CLI команды
 echo "Настройка команды 'zashitus'..."

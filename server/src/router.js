@@ -9,10 +9,13 @@ import { PasswordCheckService, validatePasswordInput } from './services/password
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-// В папке server/src/router.js, поэтому ../.. это server/
-// Нам нужно выйти в корень проекта, чтобы попасть в client/dist
-const PROJECT_ROOT = resolve(__dirname, '../..')
-const DIST_PATH = resolve(PROJECT_ROOT, '../client/dist')
+
+// Корнем сервера считаем папку, где лежит package.json сервера (на один уровень выше src)
+const SERVER_ROOT = resolve(__dirname, '..')
+// Корнем проекта считаем папку, где лежит общий package.json (на один уровень выше server)
+const PROJECT_ROOT = resolve(SERVER_ROOT, '..')
+// Путь к собранному фронтенду
+const DIST_PATH = resolve(PROJECT_ROOT, 'client/dist')
 
 console.log(`[Router] Initialized. Project Root: ${PROJECT_ROOT}`);
 console.log(`[Router] Static files path: ${DIST_PATH}`);
@@ -61,14 +64,14 @@ export async function handleRequest(req, res) {
       if (existsSync(filePath) && statSync(filePath).isFile()) {
         fileFound = true
       } else {
-        // SPA Fallback: if not found, serve index.html
+        // SPA Fallback: если файл не найден (например, при переходе по прямой ссылке в SPA), отдаем index.html
         filePath = join(DIST_PATH, 'index.html')
         if (existsSync(filePath) && statSync(filePath).isFile()) {
           fileFound = true
         }
       }
     } catch (e) {
-      // Fall through to 404
+      // Fall through
     }
 
     if (fileFound) {
@@ -83,8 +86,6 @@ export async function handleRequest(req, res) {
       } catch (e) {
         console.error(`[Router] Error reading file ${filePath}:`, e)
       }
-    } else {
-       console.warn(`[Router] Static file not found: ${url.pathname} (tried ${filePath})`)
     }
   }
 
