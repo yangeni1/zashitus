@@ -20,22 +20,22 @@ echo -e "${BLUE}=== Установка Zashitus ===${NC}"
 
 # Функция для установки зависимостей
 install_dependencies() {
-    echo -e "${YELLOW}Попытка автоматической установки зависимостей...${NC}"
+    echo -e "${YELLOW}Попытка автоматической установки зависимостей (Node.js 22+)...${NC}"
     
     if command -v apt-get >/dev/null 2>&1; then
-        echo "Настройка репозитория NodeSource для Node.js 20..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        echo "Настройка репозитория NodeSource для Node.js 22..."
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
         sudo -E apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" nodejs git curl
     elif command -v yum >/dev/null 2>&1; then
-        echo "Настройка репозитория NodeSource для Node.js 20..."
-        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        echo "Настройка репозитория NodeSource для Node.js 22..."
+        curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
         sudo yum install -y -q nodejs git curl
     elif command -v brew >/dev/null 2>&1; then
-        brew install node@20 git curl
-        brew link --overwrite node@20
+        brew install node@22 git curl
+        brew link --overwrite node@22
     else
         echo -e "${RED}Не удалось определить пакетный менеджер.${NC}"
-        echo "Пожалуйста, установите вручную: nodejs (v20+), npm, git."
+        echo "Пожалуйста, установите вручную: nodejs (v22+), npm, git."
         exit 1
     fi
 }
@@ -45,15 +45,15 @@ MISSING_DEPS=()
 echo -n "Проверка Node.js... "
 if command -v node >/dev/null 2>&1; then
     NODE_VER=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VER" -lt 20 ]; then
-        echo -e "${YELLOW}Найдена старая версия ($(node -v))${NC}"
-        MISSING_DEPS+=("Node.js (требуется v20+, у вас $NODE_VER)")
+    if [ "$NODE_VER" -lt 22 ]; then
+        echo -e "${YELLOW}Найдена старая версия ($(node -v)). Требуется v22+ для работы базы данных.${NC}"
+        MISSING_DEPS+=("Node.js (требуется v22+, у вас $NODE_VER)")
     else
         echo -e "${GREEN}OK${NC} ($(node -v))"
     fi
 else
     echo -e "${RED}Не найден${NC}"
-    MISSING_DEPS+=("Node.js (v20+)")
+    MISSING_DEPS+=("Node.js (v22+)")
 fi
 
 echo -n "Проверка git... "
@@ -72,16 +72,16 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     echo ""
 
     if [ -t 0 ] || [ -c /dev/tty ]; then
-        echo -e "${BLUE}Хотите попытаться установить/обновить их автоматически? (y/n)${NC}"
+        echo -e "${BLUE}Хотите обновить Node.js до v22 автоматически? (y/n)${NC}"
         read -p "> " confirm < /dev/tty || confirm="n"
         if [[ "$confirm" =~ ^[yY] ]]; then
             install_dependencies
         else
-            echo -e "\n${RED}Установка прервана пользователем.${NC}"
+            echo -e "\n${RED}Установка прервана. Для работы требуется Node.js v22+.${NC}"
             exit 1
         fi
     else
-        echo -e "${RED}Скрипт запущен в неинтерактивном режиме.${NC}"
+        echo -e "${RED}Скрипт запущен в неинтерактивном режиме. Требуется Node.js v22+.${NC}"
         exit 1
     fi
 fi
@@ -125,15 +125,14 @@ fi
 echo "Настройка команды 'zashitus'..."
 chmod +x bin/zashitus
 if [ -w "/usr/local/bin" ]; then
-    ln -sf "$INSTALL_DIR/bin/zashitus" /usr/local/bin/zashitus
-    export PATH="$PATH:/usr/local/bin"
+    sudo ln -sf "$INSTALL_DIR/bin/zashitus" /usr/local/bin/zashitus
 fi
 
 echo -e "\n${GREEN}=== Установка завершена успешно! ===${NC}"
 
 # Автоматический запуск после установки
 echo "Запуск сервиса..."
-"$INSTALL_DIR/bin/zashitus" start
+"$INSTALL_DIR/bin/zashitus" restart
 
 echo -e "\nИспользуйте команды:"
 echo -e "  ${BLUE}zashitus status${NC}   - проверить состояние"
