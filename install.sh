@@ -20,15 +20,27 @@ install_dependencies() {
     
     # Пытаемся определить систему
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq nodejs npm git curl
+        echo "Настройка репозитория NodeSource для Node.js 20..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y -qq nodejs git curl
     elif command -v yum >/dev/null 2>&1; then
-        sudo yum install -y -q nodejs npm git curl
+        echo "Настройка репозитория NodeSource для Node.js 20..."
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        sudo yum install -y -q nodejs git curl
     elif command -v brew >/dev/null 2>&1; then
-        brew install node git curl
+        brew install node@20 git curl
+        brew link --overwrite node@20
     else
         echo -e "${RED}Не удалось определить пакетный менеджер.${NC}"
         echo "Пожалуйста, установите вручную: nodejs (v20+), npm, git."
+        exit 1
+    fi
+    
+    # Проверка после установки
+    NEW_VER=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NEW_VER" -lt 20 ]; then
+        echo -e "${RED}Ошибка: не удалось обновить Node.js до v20. Текущая версия: $(node -v)${NC}"
+        echo "Пожалуйста, обновите Node.js вручную."
         exit 1
     fi
 }
@@ -65,10 +77,8 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     done
     echo ""
 
-    # Проверяем, запущен ли скрипт в интерактивном режиме
     if [ -t 0 ] || [ -c /dev/tty ]; then
-        echo -e "${BLUE}Хотите попытаться установить их автоматически? (y/n)${NC}"
-        # Важно: читаем из /dev/tty, так как stdin занят скриптом при curl | bash
+        echo -e "${BLUE}Хотите попытаться установить/обновить их автоматически? (y/n)${NC}"
         read -p "> " confirm < /dev/tty || confirm="n"
         
         if [[ "$confirm" =~ ^[yY] ]]; then
