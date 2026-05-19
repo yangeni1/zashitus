@@ -3,14 +3,22 @@
 # Zashitus CLI Manager
 # Утилита для управления сервисом Zashitus
 
-# Определяем корень проекта
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Определяем реальный путь к директории проекта, даже если запущен через симлинк
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+BIN_DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+PROJECT_ROOT="$(cd "$BIN_DIR/.." && pwd)"
+
 PID_FILE="$PROJECT_ROOT/zashitus.pid"
 ENV_FILE="$PROJECT_ROOT/server/.env"
 
 function start() {
     if [ -f "$PID_FILE" ]; then
-        if ps -p $(cat "$PID_FILE") > /dev/null; then
+        if ps -p $(cat "$PID_FILE") > /dev/null 2>&1; then
             echo "Zashitus уже запущен (PID: $(cat "$PID_FILE"))"
             return
         fi
@@ -19,44 +27,62 @@ function start() {
 
     echo "Запуск Zashitus..."
     cd "$PROJECT_ROOT/server"
+    # Запускаем через npm start, логи сохраняем в корне проекта
     nohup npm start > "$PROJECT_ROOT/server.log" 2>&1 &
     echo $! > "$PID_FILE"
-    echo "Сервис запущен в фоновом режиме. Логи: $PROJECT_ROOT/server.log"
+    echo "Сервис запущен в фоновом режиме."
+    echo "Адрес: http://localhost:3000 (по умолчанию)"
+    echo "Логи: $PROJECT_ROOT/server.log"
 }
 
 function stop() {
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
-        echo "Остановка Zashitus (PID: $PID)..."
-        kill $PID
+        if ps -p $PID > /dev/null 2>&1; then
+            echo "Остановка Zashitus (PID: $PID)..."
+            kill $PID
+            echo "Сервис остановлен."
+        else
+            echo "Процесс $PID не найден, очистка pid-файла."
+        fi
         rm "$PID_FILE"
-        echo "Сервис остановлен."
     else
-        echo "Сервис не запущен."
+        # На всякий случай ищем процесс по имени, если pid-файл пропал
+        PIDS=$(pgrep -f "node src/index.js" || true)
+        if [ -not -z "$PIDS" ]; then
+             echo "Остановка процессов Zashitus: $PIDS"
+             kill $PIDS
+        else
+             echo "Сервис не запущен."
+        fi
     fi
 }
 
 function restart() {
     stop
-    sleep 1
+    sleep 2
     start
 }
 
 function status() {
-    if [ -f "$PID_FILE" ] && ps -p $(cat "$PID_FILE") > /dev/null; then
-        echo "Статус: Работает (PID: $(cat "$PID_FILE"))"
-        echo "Адрес: http://localhost:3000 (по умолчанию)"
-    else
-        echo "Статус: Остановлен"
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p $PID > /dev/null 2>&1; then
+            echo "Статус: Работает (PID: $PID)"
+            echo "Адрес: http://localhost:3000"
+            return
+        fi
     fi
+    echo "Статус: Остановлен"
 }
 
 function settings() {
-    EDITOR=${EDITOR:-nano}
+    EDITOR_CMD=${EDITOR:-nano}
     if [ -f "$ENV_FILE" ]; then
-        $EDITOR "$ENV_FILE"
+        $EDITOR_CMD "$ENV_FILE"
     else
-        echo "Файл настроек .env не найден."
+        echo "Файл настроек не найден по пути: $ENV_FILE"
+        echo "Попробуйте запустить установку заново или создать файл вручную."
     fi
 }
 
