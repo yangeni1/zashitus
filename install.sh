@@ -18,6 +18,7 @@ echo -e "${BLUE}=== Установка Zashitus ===${NC}"
 install_dependencies() {
     echo -e "${YELLOW}Попытка автоматической установки зависимостей...${NC}"
     
+    # Пытаемся определить систему
     if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update -qq
         sudo apt-get install -y -qq nodejs npm git curl
@@ -36,7 +37,13 @@ install_dependencies() {
 MISSING_DEPS=()
 echo -n "Проверка Node.js... "
 if command -v node >/dev/null 2>&1; then
-    echo -e "${GREEN}OK${NC} ($(node -v))"
+    NODE_VER=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VER" -lt 20 ]; then
+        echo -e "${YELLOW}Найдена старая версия ($(node -v))${NC}"
+        MISSING_DEPS+=("Node.js (требуется v20+, у вас $NODE_VER)")
+    else
+        echo -e "${GREEN}OK${NC} ($(node -v))"
+    fi
 else
     echo -e "${RED}Не найден${NC}"
     MISSING_DEPS+=("Node.js (v20+)")
@@ -50,20 +57,29 @@ else
     MISSING_DEPS+=("git")
 fi
 
+# Если чего-то не хватает
 if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
-    echo -e "\n${YELLOW}Отсутствуют необходимые компоненты: ${MISSING_DEPS[*]}${NC}"
-    # Используем /dev/tty для чтения ввода, так как stdin занят пайпом curl
-    echo -n "Хотите установить их автоматически? (y/n): "
-    read confirm < /dev/tty
-    
-    if [[ "$confirm" == [yY] || "$confirm" == [yY][eE][sS] ]]; then
-        install_dependencies
+    echo -e "\n${YELLOW}Отсутствуют или требуют обновления компоненты:${NC}"
+    for dep in "${MISSING_DEPS[@]}"; do
+        echo -e "  - $dep"
+    done
+    echo ""
+
+    # Проверяем, запущен ли скрипт в интерактивном режиме
+    if [ -t 0 ] || [ -c /dev/tty ]; then
+        echo -e "${BLUE}Хотите попытаться установить их автоматически? (y/n)${NC}"
+        # Важно: читаем из /dev/tty, так как stdin занят скриптом при curl | bash
+        read -p "> " confirm < /dev/tty || confirm="n"
+        
+        if [[ "$confirm" =~ ^[yY] ]]; then
+            install_dependencies
+        else
+            echo -e "\n${RED}Установка прервана пользователем.${NC}"
+            exit 1
+        fi
     else
-        echo -e "\n${RED}Установка прервана пользователем.${NC}"
-        echo "Для работы Zashitus необходимы:"
-        echo "1. Node.js v20 или выше (и npm)"
-        echo "2. Git"
-        echo "3. Curl (для скачивания)"
+        echo -e "${RED}Скрипт запущен в неинтерактивном режиме.${NC}"
+        echo "Пожалуйста, установите указанные зависимости вручную и запустите установку снова."
         exit 1
     fi
 fi
@@ -80,9 +96,10 @@ echo -e "Директория установки: ${BLUE}$INSTALL_DIR${NC}"
 if [ ! -f "package.json" ]; then
     echo "Клонирование репозитория..."
     if [ -d "$INSTALL_DIR" ]; then
+        echo "Удаление старой директории установки..."
         rm -rf "$INSTALL_DIR"
     fi
-    git clone https://github.com/mikhail-root/zashitus.git "$INSTALL_DIR" --quiet
+    git clone https://github.com/yangeni1/zashitus.git "$INSTALL_DIR" --quiet
     cd "$INSTALL_DIR"
 else
     INSTALL_DIR=$(pwd)
@@ -100,7 +117,7 @@ npm run build:client --silent
 if [ ! -f "server/.env" ]; then
     echo "Создание конфигурации .env из примера..."
     cp server/.env.example server/.env
-    echo -e "${GREEN}Файл server/.env создан. Не забудьте указать API ключи!${NC}"
+    echo -e "${GREEN}Файл server/.env создан. Используйте 'zashitus settings' для настройки.${NC}"
 fi
 
 # Настройка CLI команды
@@ -112,9 +129,7 @@ if [ -w "/usr/local/bin" ]; then
     ln -sf "$INSTALL_DIR/bin/zashitus" /usr/local/bin/zashitus
     echo -e "${GREEN}Команда 'zashitus' доступна глобально!${NC}"
 else
-    echo -e "${RED}Нет прав на запись в /usr/local/bin.${NC}"
-    echo "Вы можете запустить команду вручную: $INSTALL_DIR/bin/zashitus"
-    echo "Или добавьте путь в PATH: export PATH=\$PATH:$INSTALL_DIR/bin"
+    echo -e "${YELLOW}Нет прав на запись в /usr/local/bin. Команда доступна по пути: $INSTALL_DIR/bin/zashitus${NC}"
 fi
 
 echo -e "\n${GREEN}=== Установка завершена успешно! ===${NC}"
