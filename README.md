@@ -1,41 +1,65 @@
-# Zashitus
+# Zashitus — образовательный инструмент по кибербезопасности
 
-Проект разделен на два workspace-пакета:
+Zashitus помогает пользователям оценить уровень защиты своих аккаунтов через интерактивный чек-лист и глубокий анализ паролей с использованием ИИ и базы утечек Have I Been Pwned.
 
-- `client` - React/Vite интерфейс.
-- `server` - Node.js сервер для будущих API-запросов к внешним сервисам.
+## Быстрая установка (Linux/macOS)
 
-## Установка
-
-```bash
-npm install
-```
-
-## Запуск клиента
+Вы можете установить проект одной командой через curl:
 
 ```bash
-npm run dev:client
+curl -sSL https://raw.githubusercontent.com/yangeni1/zashitus/main/install.sh | bash
 ```
 
-Обычно клиент откроется на `http://localhost:5173`.
+*Скрипт автоматически скачает проект, установит зависимости, соберет фронтенд и настроит команду `zashitus` для управления сервисом.*
 
-## Запуск сервера
+## Управление через CLI
 
-```bash
-npm run dev:server
-```
+После установки вам будет доступна команда `zashitus` для быстрого управления сайтом:
 
-Сервер слушает `http://localhost:3000`. Проверка:
+- `zashitus start` — запустить сайт в фоновом режиме.
+- `zashitus stop` — остановить работу сайта.
+- `zashitus restart` — перезапустить сервис.
+- `zashitus status` — проверить запущен ли сайт и на каком порту.
+- `zashitus settings` — быстро открыть настройки `.env` для указания ключей ИИ и другого.
 
-```bash
-curl http://localhost:3000/api/health
-```
+## Ручная установка
 
-## Проверки
+Если вы предпочитаете ручную установку:
 
-```bash
-npm run build:client
-npm run lint:client
-npm run check:server
-```
+1. **Клонируйте репозиторий:**
+   ```bash
+   git clone https://github.com/mikhail-root/zashitus.git
+   cd zashitus
+   ```
 
+2. **Установите зависимости:**
+   ```bash
+   npm install
+   ```
+
+3. **Соберите фронтенд:**
+   ```bash
+   npm run build:client
+   ```
+
+4. **Настройте переменные окружения:**
+   ```bash
+   cp server/.env.example server/.env
+   # Отредактируйте server/.env, указав ваши API ключи
+   ```
+
+5. **Запустите сервер:**
+   ```bash
+   npm run start:server
+   ```
+
+## Разработка
+
+Для запуска в режиме разработки (с горячей перезагрузкой):
+
+- **Фронтенд:** `npm run dev:client` (на `http://localhost:5173`)
+- **Бэкенд:** `npm run dev:server` (на `http://localhost:3000`)
+
+## Лицензия
+
+Проект создан в образовательных целях.

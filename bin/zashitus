@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# Zashitus CLI Manager
+# Утилита для управления сервисом Zashitus
+
+# Определяем корень проекта
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PID_FILE="$PROJECT_ROOT/zashitus.pid"
+ENV_FILE="$PROJECT_ROOT/server/.env"
+
+function start() {
+    if [ -f "$PID_FILE" ]; then
+        if ps -p $(cat "$PID_FILE") > /dev/null; then
+            echo "Zashitus уже запущен (PID: $(cat "$PID_FILE"))"
+            return
+        fi
+        rm "$PID_FILE"
+    fi
+
+    echo "Запуск Zashitus..."
+    cd "$PROJECT_ROOT/server"
+    nohup npm start > "$PROJECT_ROOT/server.log" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "Сервис запущен в фоновом режиме. Логи: $PROJECT_ROOT/server.log"
+}
+
+function stop() {
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        echo "Остановка Zashitus (PID: $PID)..."
+        kill $PID
+        rm "$PID_FILE"
+        echo "Сервис остановлен."
+    else
+        echo "Сервис не запущен."
+    fi
+}
+
+function restart() {
+    stop
+    sleep 1
+    start
+}
+
+function status() {
+    if [ -f "$PID_FILE" ] && ps -p $(cat "$PID_FILE") > /dev/null; then
+        echo "Статус: Работает (PID: $(cat "$PID_FILE"))"
+        echo "Адрес: http://localhost:3000 (по умолчанию)"
+    else
+        echo "Статус: Остановлен"
+    fi
+}
+
+function settings() {
+    EDITOR=${EDITOR:-nano}
+    if [ -f "$ENV_FILE" ]; then
+        $EDITOR "$ENV_FILE"
+    else
+        echo "Файл настроек .env не найден."
+    fi
+}
+
+function help() {
+    echo "Использование: zashitus [команда]"
+    echo ""
+    echo "Команды:"
+    echo "  start     - Запустить сервис"
+    echo "  stop      - Остановить сервис"
+    echo "  restart   - Перезапустить сервис"
+    echo "  status    - Проверить статус"
+    echo "  settings  - Изменить настройки (.env)"
+    echo "  help      - Показать эту справку"
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        restart
+        ;;
+    status)
+        status
+        ;;
+    settings)
+        settings
+        ;;
+    help|--help|-h)
+        help
+        ;;
+    *)
+        if [ -z "$1" ]; then
+            status
+        else
+            echo "Неизвестная команда: $1"
+            help
+            exit 1
+        fi
+        ;;
+esac

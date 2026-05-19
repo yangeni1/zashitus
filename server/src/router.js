@@ -1,14 +1,39 @@
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { join, resolve, extname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { config, isPasswordAiConfigured } from './config.js'
 import { createCookie, getClientIp, parseCookies, readJsonBody, sendJson } from './http.js'
 import { PasswordCheckRateLimiter } from './services/rateLimiter.js'
 import { RateLimitStore } from './services/rateLimitStore.js'
 import { PasswordCheckService, validatePasswordInput } from './services/passwordCheckService.js'
 
+const __dirname = resolve(fileURLToPath(import.meta.url), '../..')
+const DIST_PATH = resolve(__dirname, '../client/dist')
+
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.mp4': 'video/mp4',
+  '.woff': 'application/font-woff',
+  '.ttf': 'application/font-ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.otf': 'application/font-otf',
+  '.wasm': 'application/wasm',
+}
+
 let resources
 
 export async function handleRequest(req, res) {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
 
+  // API Routes
   if (req.method === 'GET' && url.pathname === '/api/health') {
     sendJson(res, 200, { status: 'ok' })
     return
@@ -17,6 +42,30 @@ export async function handleRequest(req, res) {
   if (req.method === 'POST' && url.pathname === '/api/password/check') {
     await handlePasswordCheck(req, res)
     return
+  }
+
+  // Static Files (Production)
+  if (req.method === 'GET') {
+    let filePath = join(DIST_PATH, url.pathname === '/' ? 'index.html' : url.pathname)
+    
+    // SPA Fallback: if file doesn't exist and not an API call, serve index.html
+    if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
+      filePath = join(DIST_PATH, 'index.html')
+    }
+
+    if (existsSync(filePath) && !statSync(filePath).isDirectory()) {
+      const ext = extname(filePath).toLowerCase()
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream'
+      
+      try {
+        const content = readFileSync(filePath)
+        res.writeHead(200, { 'Content-Type': contentType })
+        res.end(content)
+        return
+      } catch (e) {
+        console.error(`Error serving static file ${filePath}:`, e)
+      }
+    }
   }
 
   sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } })
