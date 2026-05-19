@@ -14,13 +14,13 @@
     padding: 0px 16px;
 }
 .second-link{
-    background-color: #fff;
+    background-color: #ffffff00;
     color: #000000;
     border: #20297C 1px solid; 
 }
 .link-button:hover{
     cursor: pointer;
-    background-color: #fff;
+    background-color: #ffffff00;
     color: #000000;
     border: #20297C 1px solid;
     transition: all 0.3s ease-in-out;

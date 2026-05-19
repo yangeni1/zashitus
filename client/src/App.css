@@ -13,6 +13,7 @@
   font-size: 42px;
   font-weight: 700;
   line-height: 48px;
+  text-align: center;
 }
 .text_container {
   width: 670px;
@@ -172,4 +173,180 @@ width: 135px !important;
 height: 40px !important;
 line-height: 24px;
 padding: 8px 0px;
+}
+/* пройти чек лист */
+.flex{
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 36px;
+}
+.flex a{
+  width: 100%;
+  height: 60px !important;
+  font-size: 26px;
+}
+.check_container{
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 32px
+}
+.item_check{
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+padding: 24px 36px;
+width: 532px;
+/* height: 272px; */
+background: #EEEFFC;
+border-radius: 16px;
+flex: none;
+order: 0;
+align-self: stretch;
+flex-grow: 1;
+position: relative;
+}
+.item_check h3{
+font-weight: 600;
+font-size: 26px;
+line-height: 32px;
+color: #000000;
+flex: none;
+order: 0;
+align-self: stretch;
+flex-grow: 0;
+margin-bottom: 12px;
+}
+.item_check p{
+font-weight: 400;
+font-size: 16px;
+line-height: 24px;
+color: #000000;
+margin-bottom: 24px;
+}
+.check_buttons_flex{
+  display: flex;
+  gap: 16px;
+}
+.check_buttons_flex button{
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.check_buttons_flex button img{
+  display: block;
+  transition: filter 0.15s ease;
+}
+.check_buttons_flex button:active img{
+  filter: brightness(0);
+}
+.count{
+width: 18px;
+height: 18px;
+font-style: normal;
+font-weight: 400;
+font-size: 13px;
+line-height: 18px;
+display: flex;
+align-items: center;
+color: #8D8D8D !important;
+position: absolute;
+right: 36px;
+bottom: 24px;
+}
+.item_check input{
+box-sizing: border-box;
+display: flex;
+flex-direction: row;
+align-items: center;
+padding: 0px 16px;
+width: 360px;
+height: 40px;
+background: #FFFFFF;
+border: 1px solid #E9E9E9;
+border-radius: 8px;
+}
+.item_check input:focus{
+  outline: none;
+  border: 1px solid #20297C;
+}
+.item_check button{
+display: flex;
+flex-direction: row;
+justify-content: center;
+align-items: center;
+padding: 0px 20px;
+width: 92px;
+height: 40px;
+background: #20297C;
+border-radius: 8px;
+flex: none;
+order: 1;
+flex-grow: 1;
+border: 1px solid #8d8d8d00;
+}
+.item_check button:active{
+  border: 1px solid #20297C;
+  transition: all 0.05s ease-in-out;
+  background: #ffffff00;
+}
+.details{
+  margin-top: 8px;
+  color: #20297C !important;
+  font-size: 13px !important;
+  line-height: 18px !important;
+}
+/* notifi */
+.notification_success{
+box-sizing: border-box;
+display: flex;
+flex-direction: row;
+align-items: flex-start;
+padding: 20px 24px;
+gap: 16px;
+width: 460px;
+/* min-height: 144px; */
+background: #E1FAE1;
+border: 1px solid #30DB32;
+border-radius: 8px;
+margin-bottom: 24px;
+}
+.notification_success button{
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 24px;
+  height: 24px
+}
+.notification_success button img{
+  display: block;
+  transition: filter 0.15s ease;
+}
+.notification_success button:active img{
+  filter: brightness(0);
+}
+.notification_success button:active{
+  border: none;
+}
+.first_text_notifi{
+  font-size: 18px;
+  line-height: 24px;
+}
+.second_text_notifi{
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 24px;
+}
+.error{
+background: #FCE1DE;
+border: 1px solid #EF3C29;
 }
