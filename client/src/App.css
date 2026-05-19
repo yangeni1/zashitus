@@ -192,7 +192,7 @@ padding: 8px 0px;
   gap: 24px;
   margin-top: 32px
 }
-.item_check{
+.item_notification{
 display: flex;
 flex-direction: column;
 align-items: flex-start;
@@ -207,7 +207,7 @@ align-self: stretch;
 flex-grow: 1;
 position: relative;
 }
-.item_check h3{
+.item_notification h3{
 font-weight: 600;
 font-size: 26px;
 line-height: 32px;
@@ -218,7 +218,7 @@ align-self: stretch;
 flex-grow: 0;
 margin-bottom: 12px;
 }
-.item_check p{
+.item_notification p{
 font-weight: 400;
 font-size: 16px;
 line-height: 24px;
@@ -259,7 +259,7 @@ position: absolute;
 right: 36px;
 bottom: 24px;
 }
-.item_check input{
+.item_notification input{
 box-sizing: border-box;
 display: flex;
 flex-direction: row;
@@ -271,11 +271,11 @@ background: #FFFFFF;
 border: 1px solid #E9E9E9;
 border-radius: 8px;
 }
-.item_check input:focus{
+.item_notification input:focus{
   outline: none;
   border: 1px solid #20297C;
 }
-.item_check button{
+.item_notification button{
 display: flex;
 flex-direction: row;
 justify-content: center;
@@ -290,7 +290,7 @@ order: 1;
 flex-grow: 1;
 border: 1px solid #8d8d8d00;
 }
-.item_check button:active{
+.item_notification button:active{
   border: 1px solid #20297C;
   transition: all 0.05s ease-in-out;
   background: #ffffff00;

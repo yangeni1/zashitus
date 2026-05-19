@@ -13,7 +13,7 @@ function CheckPage() {
         </div>
 
         <div className='check_container'>
-            <div className='item_check'>
+            <div className='item_notification'>
                 <h3>Используете ли вы 2FA?</h3>
                 <p>Метод двухфакторной аутентификации, защищает аккаунты от взлома: для входа нужно ввести не только логин и пароль, но и подтвердить личность вторым способом.</p>
 
@@ -54,7 +54,7 @@ function CheckPage() {
                 
                 <p className='count'>1/8</p>
             </div>
-            <div className='item_check'>
+            <div className='item_notification'>
                 <h3>Проверьте уязвимость пароля</h3>
                 <p>Злоумышленники регулярно осуществляют массовые взломы баз данных, из-за чего пароли «утекают» в сеть. Поэтому важно проверять, не оказался ли ваш пароль слит.</p>
                 <div className='check_buttons_flex'>
