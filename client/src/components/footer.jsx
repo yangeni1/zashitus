@@ -12,7 +12,7 @@ function  Footer() {
                 </a>
                 <div className={styles.contact}>
                     <b>Связаться с нами</b>
-                    <p>contact@zashitus.ru</p>
+                    <p>zashitus@yandex.ru</p>
                 </div>
             </div>
 
@@ -22,7 +22,7 @@ function  Footer() {
                     <a href="/rules">Правила</a>
                     <a href="/faq">FAQ</a>
                     <a href="/about">О проекте</a>
-                    <a href="/contacts">Контакты</a>
+                    <a href="/social">Соцсети</a>
                 </div>
                 <div className={styles.links}>
                     <h2>Безопасность</h2>
