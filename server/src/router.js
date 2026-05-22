@@ -261,20 +261,19 @@ async function maybeReviewWithAi({ password, pwned, passwordCheckService, aiRate
       },
     }
   } catch (error) {
-    if (error.statusCode === 502) {
-      return {
-        result: {
-          status: 'failed',
-          reason: error.code || 'MODEL_UNAVAILABLE',
-        },
-        rateLimit: {
-          limit: aiLimit.limit,
-          remaining: aiLimit.remaining,
-        },
-      }
+    // Catch everything and log as failed
+    console.error(`[Router] AI review failed for user ${clientIdentity.ip}:`, error.message)
+    
+    return {
+      result: {
+        status: 'failed',
+        reason: error.code || 'MODEL_UNAVAILABLE',
+      },
+      rateLimit: {
+        limit: aiLimit.limit,
+        remaining: aiLimit.remaining,
+      },
     }
-
-    throw error
   }
 }
 

@@ -67,6 +67,8 @@ export class OpenAiCompatibleClient {
         })
 
         if (!response.ok) {
+          const errorText = await response.text().catch(() => 'No error body')
+          console.error(`[AI] Request failed with status ${response.status}: ${errorText}`)
           const error = new Error(`OpenAI-compatible model request failed with status ${response.status}`)
           error.statusCode = 502
           error.code = 'MODEL_UNAVAILABLE'
@@ -76,7 +78,8 @@ export class OpenAiCompatibleClient {
         let result
         try {
           result = await readLimitedJson(response, this.responseLimitBytes)
-        } catch {
+        } catch (err) {
+          console.error('[AI] Failed to read or parse model JSON response:', err.message)
           const error = new Error('OpenAI-compatible model returned invalid JSON')
           error.statusCode = 502
           error.code = 'INVALID_MODEL_RESPONSE'
@@ -85,6 +88,7 @@ export class OpenAiCompatibleClient {
 
         const content = result?.choices?.[0]?.message?.content
         if (typeof content !== 'string') {
+          console.error('[AI] Model returned invalid structure:', JSON.stringify(result))
           const error = new Error('Model returned an invalid response')
           error.statusCode = 502
           error.code = 'INVALID_MODEL_RESPONSE'
@@ -94,6 +98,7 @@ export class OpenAiCompatibleClient {
         return normalizeAiReview(content, this.locale)
       } catch (err) {
         lastError = err
+        console.warn(`[AI] Attempt ${attempt + 1} failed:`, err.message)
         if (attempt < MAX_RETRIES) {
           // Wait 1s before retry
           await new Promise(resolve => setTimeout(resolve, 1000))
@@ -109,8 +114,15 @@ function normalizeAiReview(content, locale) {
   let parsed
 
   try {
-    parsed = JSON.parse(content)
-  } catch {
+    const start = content.indexOf('{')
+    const end = content.lastIndexOf('}')
+    if (start === -1 || end === -1 || end < start) {
+      throw new Error('No JSON object found in content')
+    }
+    const jsonStr = content.slice(start, end + 1)
+    parsed = JSON.parse(jsonStr)
+  } catch (err) {
+    console.error('[AI] Failed to parse content as JSON:', content)
     const error = new Error('Model response must be valid JSON')
     error.statusCode = 502
     error.code = 'INVALID_MODEL_JSON'
@@ -131,6 +143,7 @@ function normalizeAiReview(content, locale) {
     !Array.isArray(recommendations) ||
     recommendations.some((item) => typeof item !== 'string')
   ) {
+    console.error('[AI] Model response failed schema validation:', JSON.stringify(parsed))
     const error = new Error('Model response has an invalid schema')
     error.statusCode = 502
     error.code = 'INVALID_MODEL_SCHEMA'
