@@ -2,7 +2,7 @@ import { config } from '../config.js'
 import { getLocale } from '../locales/index.js'
 import { readLimitedJson } from './readLimitedResponse.js'
 
-const SYSTEM_GUARD = `You are a cybersecurity expert specializing in password cryptanalysis. Answer in Russian.`.trim()
+const SYSTEM_GUARD = `You are a strict cybersecurity auditor. Answer in Russian.`.trim()
 
 export class OpenAiCompatibleClient {
   constructor({ baseUrl, apiKey, model, passwordReviewPrompt, timeoutMs }) {
@@ -16,7 +16,6 @@ export class OpenAiCompatibleClient {
   }
 
   async reviewPassword({ password, localSignals, pwned }) {
-    // Возвращаем семантический контекст в запрос
     const userPrompt = `
 ${this.passwordReviewPrompt}
 
@@ -26,12 +25,18 @@ ${this.passwordReviewPrompt}
 - Утечки: ${pwned.isPwned ? `найден ${pwned.count} раз` : 'не обнаружен'}
 - Локальные паттерны: ${localSignals.detectedPatterns.join(', ') || 'не выявлены'}
 
-ЗАДАЧА: Проведи глубокий семантический анализ пароля (оцени логику, предсказуемость, клавиатурные сетки и возможные ассоциации). 
+КРИТЕРИИ СТРОГОЙ ОЦЕНКИ:
+1. Если пароль НАЙДЕН в утечках (даже 1 раз) — оценка НЕ МОЖЕТ быть выше 25. Это критическая уязвимость.
+2. Если в пароле есть "qwerty", "123", "password", даты или имена — оценка снижается на 50-70 баллов, даже при наличии спецсимволов.
+3. Сложность (символы/регистр) бесполезна, если пароль предсказуем.
+4. Будь максимально критичным. Лучше занизить оценку, чем дать пользователю ложное чувство безопасности.
+
+ЗАДАЧА: Проведи глубокий анализ семантики. 
 Ответь СТРОГО по шаблону (4 строки, русский язык):
 ОЦЕНКА: (число от 0 до 100)
 РИСК: (одно слово: low, medium, high или critical)
-ИТОГ: (одно емкое предложение с глубоким разбором семантики)
-СОВЕТЫ: (3 конкретных совета через запятую)
+ИТОГ: (одно емкое предложение с разбором уязвимости)
+СОВЕТЫ: (3 коротких совета через запятую)
 
 Твой ответ:`.trim()
 
@@ -48,7 +53,7 @@ ${this.passwordReviewPrompt}
           },
           body: JSON.stringify({
             model: this.model,
-            temperature: 0.3, // Чуть поднял для лучшей семантики, но не слишком высоко
+            temperature: 0.1, // Минимальная температура для стабильно жестких ответов
             messages: [
               { role: 'system', content: SYSTEM_GUARD },
               { role: 'user', content: userPrompt },
@@ -85,17 +90,15 @@ ${this.passwordReviewPrompt}
   parseTextResponse(content) {
     console.log('[AI] Raw content for parsing:', content);
 
-    // Извлекаем данные, игнорируя возможный мусор или SQL-обертки
     const scoreMatch = content.match(/ОЦЕНКА:\s*(\d+)/i) || content.match(/(\d+)/)
     const riskMatch = content.match(/РИСК:\s*(low|medium|high|critical)/i) || content.match(/(low|medium|high|critical)/i)
     const summaryMatch = content.match(/ИТОГ:\s*([^\n]+)/i)
     const adviceMatch = content.match(/СОВЕТЫ:\s*([^\n]+)/i)
 
-    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50
-    const riskLevel = riskMatch ? riskMatch[1].toLowerCase() : 'medium'
-    const summary = summaryMatch ? summaryMatch[1].trim() : 'Требуется более сложная структура пароля.'
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 10
+    const riskLevel = riskMatch ? riskMatch[1].toLowerCase() : 'critical'
+    const summary = summaryMatch ? summaryMatch[1].trim() : 'Пароль крайне небезопасен.'
     
-    // Обработка советов: если они через запятую, делим, иначе берем как есть
     let recommendations = []
     if (adviceMatch) {
       const rawAdvice = adviceMatch[1].trim()
