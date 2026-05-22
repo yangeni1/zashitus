@@ -2,7 +2,7 @@ import { config } from '../config.js'
 import { getLocale } from '../locales/index.js'
 import { readLimitedJson } from './readLimitedResponse.js'
 
-const SYSTEM_GUARD = `You are a strict cybersecurity auditor. Answer in Russian.`.trim()
+const SYSTEM_GUARD = `You are a cybersecurity expert. Answer in Russian.`.trim()
 
 export class OpenAiCompatibleClient {
   constructor({ baseUrl, apiKey, model, passwordReviewPrompt, timeoutMs }) {
@@ -25,18 +25,16 @@ ${this.passwordReviewPrompt}
 - Утечки: ${pwned.isPwned ? `найден ${pwned.count} раз` : 'не обнаружен'}
 - Локальные паттерны: ${localSignals.detectedPatterns.join(', ') || 'не выявлены'}
 
-КРИТЕРИИ СТРОГОЙ ОЦЕНКИ:
-1. Если пароль НАЙДЕН в утечках (даже 1 раз) — оценка НЕ МОЖЕТ быть выше 25. Это критическая уязвимость.
-2. Если в пароле есть "qwerty", "123", "password", даты или имена — оценка снижается на 50-70 баллов, даже при наличии спецсимволов.
-3. Сложность (символы/регистр) бесполезна, если пароль предсказуем.
-4. Будь максимально критичным. Лучше занизить оценку, чем дать пользователю ложное чувство безопасности.
+КРИТЕРИИ ОЦЕНКИ:
+1. Если пароль в утечках — ОЦЕНКА до 25.
+2. Если есть "qwerty", "123", даты — ОЦЕНКА резко снижается.
+3. Будь объективен, но строг.
 
-ЗАДАЧА: Проведи глубокий анализ семантики. 
-Ответь СТРОГО по шаблону (4 строки, русский язык):
-ОЦЕНКА: (число от 0 до 100)
-РИСК: (одно слово: low, medium, high или critical)
-ИТОГ: (одно емкое предложение с разбором уязвимости)
-СОВЕТЫ: (3 коротких совета через запятую)
+ОТВЕТЬ СТРОГО ПО ШАБЛОНУ (на русском):
+ОЦЕНКА: (число 0-100)
+РИСК: (low, medium, high или critical)
+ИТОГ: (1-2 предложения анализа, макс 200 символов)
+СОВЕТЫ: (до 3 кратких советов через точку с запятой)
 
 Твой ответ:`.trim()
 
@@ -53,7 +51,7 @@ ${this.passwordReviewPrompt}
           },
           body: JSON.stringify({
             model: this.model,
-            temperature: 0.1, // Минимальная температура для стабильно жестких ответов
+            temperature: 0.4, // Возвращаем чуть больше свободы для семантики
             messages: [
               { role: 'system', content: SYSTEM_GUARD },
               { role: 'user', content: userPrompt },
@@ -90,28 +88,40 @@ ${this.passwordReviewPrompt}
   parseTextResponse(content) {
     console.log('[AI] Raw content for parsing:', content);
 
-    const scoreMatch = content.match(/ОЦЕНКА:\s*(\d+)/i) || content.match(/(\d+)/)
-    const riskMatch = content.match(/РИСК:\s*(low|medium|high|critical)/i) || content.match(/(low|medium|high|critical)/i)
-    const summaryMatch = content.match(/ИТОГ:\s*([^\n]+)/i)
-    const adviceMatch = content.match(/СОВЕТЫ:\s*([^\n]+)/i)
+    // Функция для извлечения текста между метками
+    const extract = (marker, nextMarker) => {
+      const startIdx = content.indexOf(marker)
+      if (startIdx === -1) return null
+      
+      const textAfterMarker = content.slice(startIdx + marker.length)
+      const endIdx = nextMarker ? textAfterMarker.indexOf(nextMarker) : -1
+      
+      const result = endIdx === -1 ? textAfterMarker : textAfterMarker.slice(0, endIdx)
+      return result.trim().replace(/^[:\s-]+/, '')
+    }
 
-    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 10
-    const riskLevel = riskMatch ? riskMatch[1].toLowerCase() : 'critical'
-    const summary = summaryMatch ? summaryMatch[1].trim() : 'Пароль крайне небезопасен.'
+    const scoreStr = extract('ОЦЕНКА:', 'РИСК:') || content.match(/(\d+)/)?.[0]
+    const riskStr = extract('РИСК:', 'ИТОГ:')
+    const summaryStr = extract('ИТОГ:', 'СОВЕТЫ:')
+    const adviceStr = extract('СОВЕТЫ:', null)
+
+    const score = parseInt(scoreStr, 10) || 50
+    const riskLevel = (riskStr || 'medium').toLowerCase().match(/low|medium|high|critical/)?.[0] || 'medium'
+    const summary = summaryStr || 'Анализ завершен.'
     
     let recommendations = []
-    if (adviceMatch) {
-      const rawAdvice = adviceMatch[1].trim()
-      recommendations = rawAdvice.includes(',') 
-        ? rawAdvice.split(',').map(s => s.trim()) 
-        : [rawAdvice]
+    if (adviceStr) {
+      // Пробуем делить по точке с запятой, потом по запятой
+      recommendations = adviceStr.includes(';') 
+        ? adviceStr.split(';') 
+        : adviceStr.split(',')
     }
 
     const normalized = {
       score: Math.min(100, Math.max(0, score)),
-      riskLevel: ['low', 'medium', 'high', 'critical'].includes(riskLevel) ? riskLevel : 'medium',
-      summary: limitSentences(summary, 1),
-      recommendations: recommendations.filter(Boolean).slice(0, 3).map(r => limitSentences(r, 2)),
+      riskLevel,
+      summary: summary.slice(0, 300), // Мягкий лимит только на длину строки
+      recommendations: recommendations.map(r => r.trim()).filter(Boolean).slice(0, 3),
     }
 
     return {
@@ -119,12 +129,6 @@ ${this.passwordReviewPrompt}
       text: formatReviewText(normalized, this.locale),
     }
   }
-}
-
-function limitSentences(value, maxSentences) {
-  if (!value) return ''
-  const sentences = value.match(/[^.!?]+[.!?]?/g) || [value]
-  return sentences.slice(0, maxSentences).join(' ').replace(/\s+/g, ' ').trim()
 }
 
 function formatReviewText({ score, riskLevel, summary, recommendations }, locale) {
