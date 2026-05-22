@@ -315,7 +315,13 @@ function CheckPage() {
                         </div>
                         
                         {passwordApiResult.ai?.status === 'completed' ? (
-                            <p style={{ fontSize: '13px', margin: '4px 0', lineHeight: '1.5', color: '#333' }}>
+                            <p style={{ 
+                                fontSize: '13px', 
+                                margin: '4px 0', 
+                                lineHeight: '1.5', 
+                                color: '#333',
+                                whiteSpace: 'pre-wrap' 
+                            }}>
                                 {passwordApiResult.ai.review.text}
                             </p>
                         ) : (
