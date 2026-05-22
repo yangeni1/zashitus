@@ -2,10 +2,7 @@ import { config } from '../config.js'
 import { getLocale } from '../locales/index.js'
 import { readLimitedJson } from './readLimitedResponse.js'
 
-const SYSTEM_GUARD = `
-You are a password security evaluator. Answer in Russian only.
-Return ONLY a valid JSON object. No SQL, no markdown, no explanations.
-`.trim()
+const SYSTEM_GUARD = `You are a security expert. Answer in Russian.`.trim()
 
 export class OpenAiCompatibleClient {
   constructor({ baseUrl, apiKey, model, passwordReviewPrompt, timeoutMs }) {
@@ -19,22 +16,16 @@ export class OpenAiCompatibleClient {
   }
 
   async reviewPassword({ password, localSignals, pwned }) {
-    // Формируем максимально четкую инструкцию для user-сообщения
+    // Уходим от слова JSON, просим просто текст по строкам
     const userPrompt = `
-${this.passwordReviewPrompt}
+Оцени безопасность пароля: "${password}"
+${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.count} раз.` : 'Пароль пока не найден в базах утечек.'}
 
-Оцени этот пароль: "${password}"
-Данные о взломах: ${pwned.isPwned ? `найден ${pwned.count} раз` : 'не найден'}
-Технические сигналы: длина ${localSignals.length}, уникальных символов ${localSignals.uniqueChars}
-
-ВАЖНО: Ответь СТРОГО в формате JSON на русском языке.
-Пример ответа:
-{
-  "score": 50,
-  "riskLevel": "medium",
-  "summary": "Краткое описание на русском.",
-  "recommendations": ["Рекомендация 1", "Рекомендация 2"]
-}
+Ответь строго по этому шаблону (4 строки на русском):
+ОЦЕНКА: (число от 0 до 100)
+РИСК: (одно слово: low, medium, high или critical)
+ИТОГ: (одно предложение)
+СОВЕТЫ: (максимум 3 совета через запятую)
 
 Твой ответ:`.trim()
 
@@ -52,16 +43,9 @@ ${this.passwordReviewPrompt}
           body: JSON.stringify({
             model: this.model,
             temperature: 0.1,
-            // Убираем жесткий json_object, так как он может ломать дешевые модели
             messages: [
-              {
-                role: 'system',
-                content: SYSTEM_GUARD,
-              },
-              {
-                role: 'user',
-                content: userPrompt,
-              },
+              { role: 'system', content: SYSTEM_GUARD },
+              { role: 'user', content: userPrompt },
             ],
           }),
           signal: AbortSignal.timeout(this.timeoutMs),
@@ -69,34 +53,17 @@ ${this.passwordReviewPrompt}
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'No error body')
-          console.error(`[AI] Request failed with status ${response.status}: ${errorText}`)
-          const error = new Error(`OpenAI-compatible model request failed with status ${response.status}`)
-          error.statusCode = 502
-          error.code = 'MODEL_UNAVAILABLE'
-          throw error
+          throw new Error(`AI Status ${response.status}: ${errorText}`)
         }
 
-        let result
-        try {
-          result = await readLimitedJson(response, this.responseLimitBytes)
-        } catch (err) {
-          console.error('[AI] Failed to read or parse model JSON response:', err.message)
-          const error = new Error('OpenAI-compatible model returned invalid JSON')
-          error.statusCode = 502
-          error.code = 'INVALID_MODEL_RESPONSE'
-          throw error
-        }
-
+        const result = await readLimitedJson(response, this.responseLimitBytes)
         const content = result?.choices?.[0]?.message?.content
+        
         if (typeof content !== 'string') {
-          console.error('[AI] Model returned invalid structure:', JSON.stringify(result))
-          const error = new Error('Model returned an invalid response')
-          error.statusCode = 502
-          error.code = 'INVALID_MODEL_RESPONSE'
-          throw error
+          throw new Error('Invalid AI response structure')
         }
 
-        return normalizeAiReview(content, this.locale)
+        return this.parseTextResponse(content)
       } catch (err) {
         lastError = err
         console.warn(`[AI] Attempt ${attempt + 1} failed:`, err.message)
@@ -108,81 +75,47 @@ ${this.passwordReviewPrompt}
 
     throw lastError
   }
-}
 
-function normalizeAiReview(content, locale) {
-  let parsed
+  parseTextResponse(content) {
+    console.log('[AI] Raw content for parsing:', content);
 
-  try {
-    // Ищем JSON внутри ответа (на случай если модель добавила текст)
-    const start = content.indexOf('{')
-    const end = content.lastIndexOf('}')
-    if (start === -1 || end === -1 || end < start) {
-      throw new Error('No JSON object found in content')
+    // Если она всё еще пишет SELECT, попробуем вытащить данные регулярками
+    const scoreMatch = content.match(/ОЦЕНКА:\s*(\d+)/i) || content.match(/(\d+)/)
+    const riskMatch = content.match(/РИСК:\s*(low|medium|high|critical)/i) || content.match(/(low|medium|high|critical)/i)
+    const summaryMatch = content.match(/ИТОГ:\s*([^\n]+)/i)
+    const adviceMatch = content.match(/СОВЕТЫ:\s*([^\n]+)/i)
+
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50
+    const riskLevel = riskMatch ? riskMatch[1].toLowerCase() : 'medium'
+    const summary = summaryMatch ? summaryMatch[1].trim() : 'Требуется улучшение безопасности.'
+    const recommendations = adviceMatch 
+        ? adviceMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+        : []
+
+    const normalized = {
+      score: Math.min(100, Math.max(0, score)),
+      riskLevel: ['low', 'medium', 'high', 'critical'].includes(riskLevel) ? riskLevel : 'medium',
+      summary: limitSentences(summary, 1),
+      recommendations: recommendations.slice(0, 3).map(r => limitSentences(r, 2)),
     }
-    const jsonStr = content.slice(start, end + 1)
-    parsed = JSON.parse(jsonStr)
-  } catch (err) {
-    console.error('[AI] Raw content from model:', content)
-    const error = new Error('Model response must be valid JSON')
-    error.statusCode = 502
-    error.code = 'INVALID_MODEL_JSON'
-    throw error
-  }
 
-  const score = Number(parsed.score)
-  const riskLevel = parsed.riskLevel
-  const summary = parsed.summary
-  const recommendations = parsed.recommendations
-
-  if (
-    !Number.isFinite(score) ||
-    score < 0 ||
-    score > 100 ||
-    !['low', 'medium', 'high', 'critical'].includes(riskLevel) ||
-    typeof summary !== 'string' ||
-    !Array.isArray(recommendations)
-  ) {
-    console.error('[AI] Model response failed schema validation:', JSON.stringify(parsed))
-    const error = new Error('Model response has an invalid schema')
-    error.statusCode = 502
-    error.code = 'INVALID_MODEL_SCHEMA'
-    throw error
-  }
-
-  const normalizedRecommendations = recommendations
-    .map((item) => typeof item === 'string' ? limitSentences(item.trim(), 2) : '')
-    .filter(Boolean)
-    .slice(0, 3)
-
-  const normalized = {
-    score: Math.round(score),
-    riskLevel,
-    summary: limitSentences(summary.trim(), 1),
-    recommendations: normalizedRecommendations,
-  }
-
-  return {
-    ...normalized,
-    text: formatReviewText(normalized, locale),
+    return {
+      ...normalized,
+      text: formatReviewText(normalized, this.locale),
+    }
   }
 }
 
 function limitSentences(value, maxSentences) {
   const sentences = value.match(/[^.!?]+[.!?]?/g) || [value]
-  return sentences
-    .slice(0, maxSentences)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return sentences.slice(0, maxSentences).join(' ').replace(/\s+/g, ' ').trim()
 }
 
 function formatReviewText({ score, riskLevel, summary, recommendations }, locale) {
   const riskLabel = locale.aiReview.risk[riskLevel]
-  const advice =
-    recommendations.length > 0
-      ? ` ${locale.aiReview.recommendationsLabel}: ${recommendations.join(' ')}`
-      : ''
+  const advice = recommendations.length > 0
+    ? ` ${locale.aiReview.recommendationsLabel}: ${recommendations.join(' ')}`
+    : ''
 
   return locale.aiReview.textTemplate
     .replace('{score}', score)
