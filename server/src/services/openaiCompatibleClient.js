@@ -14,22 +14,44 @@ export class OpenAiCompatibleClient {
   }
 
   async reviewPassword({ password, localSignals, pwned }) {
-    const leakStatus = pwned.isPwned 
-      ? `Утечки: найден ${pwned.count} раз. Это критично.`
-      : 'Утечки: не найден в базах.';
+    // 1. РАССЧИТЫВАЕМ ОБЪЕКТИВНУЮ ОЦЕНКУ В КОДЕ
+    let score = 0;
+    score += Math.min(password.length * 5, 40); // Длина: до 40 баллов
+    score += Math.min(localSignals.uniqueChars * 5, 30); // Уникальность: до 30 баллов
+    if (localSignals.hasUppercase) score += 10;
+    if (localSignals.hasDigit) score += 10;
+    if (localSignals.hasSymbol) score += 10;
 
+    // Штрафы
+    if (localSignals.detectedPatterns.length > 0) score -= 40;
+    if (pwned.isPwned) score = Math.min(score, 15); // Если слит — максимум 15 баллов
+
+    score = Math.min(100, Math.max(0, score));
+
+    let riskLevel = 'low';
+    if (score < 30) riskLevel = 'critical';
+    else if (score < 50) riskLevel = 'high';
+    else if (score < 80) riskLevel = 'medium';
+
+    const riskRus = { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий' }[riskLevel];
+
+    // 2. ФОРМИРУЕМ ПРОМПТ С ПРИМЕРАМИ (FEW-SHOT)
     const userPrompt = `
-ОБЪЕКТ: "${password}"
-ДАННЫЕ: длина ${localSignals.length}, уникальность ${localSignals.uniqueChars}, ${leakStatus}, паттерны: ${localSignals.detectedPatterns.join(', ') || 'нет'}.
+Инструкция: Ты — помощник по безопасности. Твоя задача — кратко прокомментировать уже рассчитанную оценку пароля.
+Пиши ТОЛЬКО на русском языке. Будь кратким (до 250 символов).
 
-ИНСТРУКЦИЯ (ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ):
-Проведи экспертный аудит этого пароля. 
-Сначала напиши оценку (0-100) и уровень риска.
-Затем напиши подробный анализ (2-3 предложения) и дай пару советов.
-Не повторяй мои инструкции в ответе. Пиши сразу по существу.
-Разделяй блоки текста пустыми строками.
+ПРИМЕР 1:
+Данные: Пароль "123456", Оценка 5, Риск Критический.
+Ответ: Этот пароль слишком прост и возглавляет списки самых популярных. Его взломают мгновенно. Срочно замените его на что-то более длинное и уникальное.
 
-ОТВЕТ НА РУССКОМ:`.trim()
+ПРИМЕР 2:
+Данные: Пароль "Sun!Rise9922", Оценка 85, Риск Низкий.
+Ответ: Хороший, устойчивый пароль. Использование разных регистров и цифр делает его надежным. Совет: не используйте его повторно на других сайтах.
+
+ТЕКУЩЕЕ ЗАДАНИЕ:
+Данные: Пароль "${password}", Оценка ${score}, Риск ${riskRus}.
+(Помни: статус утечки — ${pwned.isPwned ? 'СЛИТ В СЕТЬ' : 'чист'}).
+Твой краткий ответ на русском:`.trim()
 
     const MAX_RETRIES = 1
     let lastError
@@ -44,8 +66,9 @@ export class OpenAiCompatibleClient {
           },
           body: JSON.stringify({
             model: this.model,
+            temperature: 0.3,
             messages: [
-              { role: 'system', content: this.passwordReviewPrompt + " ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ." },
+              { role: 'system', content: "Ты — лаконичный ассистент по безопасности. Отвечаешь только на русском." },
               { role: 'user', content: userPrompt },
             ],
           }),
@@ -64,7 +87,14 @@ export class OpenAiCompatibleClient {
           throw new Error('Invalid AI response structure')
         }
 
-        return this.simplifyResponse(content)
+        // Возвращаем честные цифры и текст от ИИ
+        return {
+          score,
+          riskLevel,
+          summary: content.trim(),
+          recommendations: [],
+          text: `Оценка: ${score}/100. Риск: ${riskRus.toLowerCase()}.\n\n${content.trim()}`,
+        }
       } catch (err) {
         lastError = err
         console.warn(`[AI] Attempt ${attempt + 1} failed:`, err.message)
@@ -75,26 +105,5 @@ export class OpenAiCompatibleClient {
     }
 
     throw lastError
-  }
-
-  simplifyResponse(content) {
-    console.log('[AI] Raw response:', content);
-
-    const scoreMatch = content.match(/(\d+)\/100/) || content.match(/Оценка:\s*(\d+)/i) || content.match(/(\d+)/);
-    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50;
-
-    let riskLevel = 'medium';
-    const low = content.toLowerCase();
-    if (low.includes('critical') || low.includes('критич')) riskLevel = 'critical';
-    else if (low.includes('high') || low.includes('высок')) riskLevel = 'high';
-    else if (low.includes('low') || low.includes('низк')) riskLevel = 'low';
-
-    return {
-      score: Math.min(100, Math.max(0, score)),
-      riskLevel,
-      summary: content.trim(),
-      recommendations: [],
-      text: content.trim(),
-    }
   }
 }
