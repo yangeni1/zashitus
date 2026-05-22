@@ -2,8 +2,6 @@ import { config } from '../config.js'
 import { getLocale } from '../locales/index.js'
 import { readLimitedJson } from './readLimitedResponse.js'
 
-const SYSTEM_GUARD = `You are a cybersecurity expert. Answer in Russian.`.trim()
-
 export class OpenAiCompatibleClient {
   constructor({ baseUrl, apiKey, model, passwordReviewPrompt, timeoutMs }) {
     this.baseUrl = baseUrl.replace(/\/$/, '')
@@ -17,32 +15,20 @@ export class OpenAiCompatibleClient {
 
   async reviewPassword({ password, localSignals, pwned }) {
     const leakStatus = pwned.isPwned 
-      ? `КРИТИЧЕСКИЙ ФАКТ: Пароль обнаружен в базе утечек ${pwned.count} раз. Это делает его крайне опасным независимо от сложности.`
+      ? `КРИТИЧЕСКИЙ ФАКТ: Пароль найден в базе утечек ${pwned.count} раз.`
       : 'ФАКТ: Пароль не найден в известных базах утечек.';
 
     const userPrompt = `
-Проанализируй безопасность этого конкретного пароля: "${password}"
-
-ДАННЫЕ:
+Объект анализа: "${password}"
+Данные:
 - Длина: ${localSignals.length}
 - Уникальность: ${localSignals.uniqueChars}
 - ${leakStatus}
-- Паттерны: ${localSignals.detectedPatterns.join(', ') || 'не обнаружены'}
+- Паттерны: ${localSignals.detectedPatterns.join(', ') || 'нет'}
 
-ТВОЯ ЛОГИКА (НЕ УПОМИНАЙ ЭТИ ПРАВИЛА В ОТВЕТЕ):
-- Слитый пароль = ОЦЕНКА до 20, РИСК critical.
-- Пароль с "qwerty", "123", "admin" и т.п. = ОЦЕНКА до 30.
-- Не пиши общих фраз типа "если пароль используется в утечках". Пиши только про этот пароль здесь и сейчас.
+Проведи анализ согласно своим инструкциям. Твой ответ:`.trim()
 
-ОТВЕТЬ СТРОГО ПО ШАБЛОНУ:
-ОЦЕНКА: (число 0-100)
-РИСК: (low, medium, high или critical)
-ИТОГ: (развернутый семантический анализ этого пароля в 1-2 предложениях)
-СОВЕТЫ: (3 практических совета через точку с запятой)
-
-Твой ответ:`.trim()
-
-    const MAX_RETRIES = 2
+    const MAX_RETRIES = 1
     let lastError
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -55,9 +41,8 @@ export class OpenAiCompatibleClient {
           },
           body: JSON.stringify({
             model: this.model,
-            temperature: 0.5, // Повышаем для лучшей семантики и живого языка
             messages: [
-              { role: 'system', content: SYSTEM_GUARD },
+              { role: 'system', content: this.passwordReviewPrompt },
               { role: 'user', content: userPrompt },
             ],
           }),
@@ -76,7 +61,7 @@ export class OpenAiCompatibleClient {
           throw new Error('Invalid AI response structure')
         }
 
-        return this.parseTextResponse(content)
+        return this.simplifyResponse(content)
       } catch (err) {
         lastError = err
         console.warn(`[AI] Attempt ${attempt + 1} failed:`, err.message)
@@ -89,60 +74,26 @@ export class OpenAiCompatibleClient {
     throw lastError
   }
 
-  parseTextResponse(content) {
-    console.log('[AI] Raw content for parsing:', content);
+  simplifyResponse(content) {
+    console.log('[AI] Raw response:', content);
 
-    const extract = (marker, nextMarker) => {
-      const startIdx = content.indexOf(marker)
-      if (startIdx === -1) return null
-      
-      const textAfterMarker = content.slice(startIdx + marker.length)
-      const endIdx = nextMarker ? textAfterMarker.indexOf(nextMarker) : -1
-      
-      const result = endIdx === -1 ? textAfterMarker : textAfterMarker.slice(0, endIdx)
-      return result.trim().replace(/^[:\s-]+/, '')
-    }
+    // Извлекаем оценку (ищем X/100 или просто число в начале/конце предложения)
+    const scoreMatch = content.match(/(\d+)\/100/) || content.match(/Оценка:\s*(\d+)/i) || content.match(/(\d+)/);
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50;
 
-    const scoreStr = extract('ОЦЕНКА:', 'РИСК:') || content.match(/(\d+)/)?.[0]
-    const riskStr = extract('РИСК:', 'ИТОГ:')
-    const summaryStr = extract('ИТОГ:', 'СОВЕТЫ:')
-    const adviceStr = extract('СОВЕТЫ:', null)
-
-    const score = parseInt(scoreStr, 10) || 50
-    const riskLevel = (riskStr || 'medium').toLowerCase().match(/low|medium|high|critical/)?.[0] || 'medium'
-    const summary = summaryStr || 'Анализ завершен.'
-    
-    let recommendations = []
-    if (adviceStr) {
-      recommendations = adviceStr.includes(';') 
-        ? adviceStr.split(';') 
-        : adviceStr.split(',')
-    }
-
-    const normalized = {
-      score: Math.min(100, Math.max(0, score)),
-      riskLevel,
-      summary: summary.slice(0, 400), 
-      recommendations: recommendations.map(r => r.trim()).filter(Boolean).slice(0, 3),
-    }
+    // Определяем уровень риска по ключевым словам для UI
+    let riskLevel = 'medium';
+    const low = content.toLowerCase();
+    if (low.includes('critical') || low.includes('критич')) riskLevel = 'critical';
+    else if (low.includes('high') || low.includes('высок')) riskLevel = 'high';
+    else if (low.includes('low') || low.includes('низк')) riskLevel = 'low';
 
     return {
-      ...normalized,
-      text: formatReviewText(normalized, this.locale),
+      score: Math.min(100, Math.max(0, score)),
+      riskLevel,
+      summary: content.trim(),
+      recommendations: [],
+      text: content.trim(),
     }
   }
-}
-
-function formatReviewText({ score, riskLevel, summary, recommendations }, locale) {
-  const riskLabel = locale.aiReview.risk[riskLevel]
-  const advice = recommendations.length > 0
-    ? ` ${locale.aiReview.recommendationsLabel}: ${recommendations.join(' ')}`
-    : ''
-
-  return locale.aiReview.textTemplate
-    .replace('{score}', score)
-    .replace('{risk}', riskLabel)
-    .replace('{summary}', summary)
-    .replace('{advice}', advice)
-    .trim()
 }
