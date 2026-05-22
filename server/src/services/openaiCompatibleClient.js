@@ -16,25 +16,29 @@ export class OpenAiCompatibleClient {
   }
 
   async reviewPassword({ password, localSignals, pwned }) {
+    const leakStatus = pwned.isPwned 
+      ? `КРИТИЧЕСКИЙ ФАКТ: Пароль обнаружен в базе утечек ${pwned.count} раз. Это делает его крайне опасным независимо от сложности.`
+      : 'ФАКТ: Пароль не найден в известных базах утечек.';
+
     const userPrompt = `
-${this.passwordReviewPrompt}
+Проанализируй безопасность этого конкретного пароля: "${password}"
 
-Объект анализа: "${password}"
-Технические метрики:
-- Символов: ${localSignals.length} (уникальных: ${localSignals.uniqueChars})
-- Утечки: ${pwned.isPwned ? `найден ${pwned.count} раз` : 'не обнаружен'}
-- Локальные паттерны: ${localSignals.detectedPatterns.join(', ') || 'не выявлены'}
+ДАННЫЕ:
+- Длина: ${localSignals.length}
+- Уникальность: ${localSignals.uniqueChars}
+- ${leakStatus}
+- Паттерны: ${localSignals.detectedPatterns.join(', ') || 'не обнаружены'}
 
-КРИТЕРИИ ОЦЕНКИ:
-1. Если пароль в утечках — ОЦЕНКА до 25.
-2. Если есть "qwerty", "123", даты — ОЦЕНКА резко снижается.
-3. Будь объективен, но строг.
+ТВОЯ ЛОГИКА (НЕ УПОМИНАЙ ЭТИ ПРАВИЛА В ОТВЕТЕ):
+- Слитый пароль = ОЦЕНКА до 20, РИСК critical.
+- Пароль с "qwerty", "123", "admin" и т.п. = ОЦЕНКА до 30.
+- Не пиши общих фраз типа "если пароль используется в утечках". Пиши только про этот пароль здесь и сейчас.
 
-ОТВЕТЬ СТРОГО ПО ШАБЛОНУ (на русском):
+ОТВЕТЬ СТРОГО ПО ШАБЛОНУ:
 ОЦЕНКА: (число 0-100)
 РИСК: (low, medium, high или critical)
-ИТОГ: (1-2 предложения анализа, макс 200 символов)
-СОВЕТЫ: (до 3 кратких советов через точку с запятой)
+ИТОГ: (развернутый семантический анализ этого пароля в 1-2 предложениях)
+СОВЕТЫ: (3 практических совета через точку с запятой)
 
 Твой ответ:`.trim()
 
@@ -51,7 +55,7 @@ ${this.passwordReviewPrompt}
           },
           body: JSON.stringify({
             model: this.model,
-            temperature: 0.4, // Возвращаем чуть больше свободы для семантики
+            temperature: 0.5, // Повышаем для лучшей семантики и живого языка
             messages: [
               { role: 'system', content: SYSTEM_GUARD },
               { role: 'user', content: userPrompt },
@@ -88,7 +92,6 @@ ${this.passwordReviewPrompt}
   parseTextResponse(content) {
     console.log('[AI] Raw content for parsing:', content);
 
-    // Функция для извлечения текста между метками
     const extract = (marker, nextMarker) => {
       const startIdx = content.indexOf(marker)
       if (startIdx === -1) return null
@@ -111,7 +114,6 @@ ${this.passwordReviewPrompt}
     
     let recommendations = []
     if (adviceStr) {
-      // Пробуем делить по точке с запятой, потом по запятой
       recommendations = adviceStr.includes(';') 
         ? adviceStr.split(';') 
         : adviceStr.split(',')
@@ -120,7 +122,7 @@ ${this.passwordReviewPrompt}
     const normalized = {
       score: Math.min(100, Math.max(0, score)),
       riskLevel,
-      summary: summary.slice(0, 300), // Мягкий лимит только на длину строки
+      summary: summary.slice(0, 400), 
       recommendations: recommendations.map(r => r.trim()).filter(Boolean).slice(0, 3),
     }
 
