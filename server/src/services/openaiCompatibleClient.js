@@ -16,42 +16,43 @@ export class OpenAiCompatibleClient {
   async reviewPassword({ password, localSignals, pwned }) {
     // 1. РАССЧИТЫВАЕМ ОБЪЕКТИВНУЮ ОЦЕНКУ В КОДЕ
     let score = 0;
-    score += Math.min(password.length * 5, 40); // Длина: до 40 баллов
-    score += Math.min(localSignals.uniqueChars * 5, 30); // Уникальность: до 30 баллов
+    score += Math.min(password.length * 6, 45); // Длина: до 45 баллов
+    score += Math.min(localSignals.uniqueChars * 5, 25); // Уникальность: до 25 баллов
     if (localSignals.hasUppercase) score += 10;
     if (localSignals.hasDigit) score += 10;
     if (localSignals.hasSymbol) score += 10;
 
     // Штрафы
-    if (localSignals.detectedPatterns.length > 0) score -= 40;
-    if (pwned.isPwned) score = Math.min(score, 15); // Если слит — максимум 15 баллов
+    if (localSignals.detectedPatterns.length > 0) score -= 35;
+    if (pwned.isPwned) score = Math.min(score, 15); // Если слит — жесткий лимит
 
     score = Math.min(100, Math.max(0, score));
 
     let riskLevel = 'low';
     if (score < 30) riskLevel = 'critical';
-    else if (score < 50) riskLevel = 'high';
+    else if (score < 55) riskLevel = 'high';
     else if (score < 80) riskLevel = 'medium';
 
     const riskRus = { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий' }[riskLevel];
 
-    // 2. ФОРМИРУЕМ ПРОМПТ С ПРИМЕРАМИ (FEW-SHOT)
+    // 2. ФОРМИРУЕМ ПРОМПТ С ПРИМЕРАМИ
     const userPrompt = `
-Инструкция: Ты — помощник по безопасности. Твоя задача — кратко прокомментировать уже рассчитанную оценку пароля.
-Пиши ТОЛЬКО на русском языке. Будь кратким (до 250 символов).
+Ты — эксперт по безопасности. Твоя задача: кратко ОБОСНОВАТЬ готовую оценку пароля.
+Высокая оценка (80-100) — это ПОХВАЛА за длину и сложность.
+Низкая оценка (0-40) — это ПРЕДУПРЕЖДЕНИЕ об опасности.
 
-ПРИМЕР 1:
-Данные: Пароль "123456", Оценка 5, Риск Критический.
-Ответ: Этот пароль слишком прост и возглавляет списки самых популярных. Его взломают мгновенно. Срочно замените его на что-то более длинное и уникальное.
+ПРИМЕР 1 (Плохо):
+Данные: Пароль "qwerty", Оценка 5, Риск Критический.
+Ответ: Крайне небезопасный вариант. Такие комбинации взламываются за доли секунды автоматическими скриптами. Обязательно выберите что-то более непредсказуемое.
 
-ПРИМЕР 2:
-Данные: Пароль "Sun!Rise9922", Оценка 85, Риск Низкий.
-Ответ: Хороший, устойчивый пароль. Использование разных регистров и цифр делает его надежным. Совет: не используйте его повторно на других сайтах.
+ПРИМЕР 2 (Отлично):
+Данные: Пароль "K9#fL29!pXzQ", Оценка 100, Риск Низкий.
+Ответ: Идеальный уровень защиты. Большая длина в сочетании со спецсимволами и случайным набором знаков делает перебор практически невозможным. Так держать!
 
 ТЕКУЩЕЕ ЗАДАНИЕ:
 Данные: Пароль "${password}", Оценка ${score}, Риск ${riskRus}.
-(Помни: статус утечки — ${pwned.isPwned ? 'СЛИТ В СЕТЬ' : 'чист'}).
-Твой краткий ответ на русском:`.trim()
+(Доп. факт: ${pwned.isPwned ? 'пароль найден в утечках' : 'пароль не найден в утечках'}).
+Твой экспертный вердикт на русском (до 250 символов):`.trim()
 
     const MAX_RETRIES = 1
     let lastError
@@ -68,7 +69,7 @@ export class OpenAiCompatibleClient {
             model: this.model,
             temperature: 0.3,
             messages: [
-              { role: 'system', content: "Ты — лаконичный ассистент по безопасности. Отвечаешь только на русском." },
+              { role: 'system', content: "Ты — лаконичный эксперт по безопасности. Отвечаешь только на русском языке." },
               { role: 'user', content: userPrompt },
             ],
           }),
@@ -87,7 +88,6 @@ export class OpenAiCompatibleClient {
           throw new Error('Invalid AI response structure')
         }
 
-        // Возвращаем честные цифры и текст от ИИ
         return {
           score,
           riskLevel,
