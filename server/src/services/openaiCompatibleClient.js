@@ -15,30 +15,21 @@ export class OpenAiCompatibleClient {
 
   async reviewPassword({ password, localSignals, pwned }) {
     const leakStatus = pwned.isPwned 
-      ? `КРИТИЧЕСКИЙ ФАКТ: Пароль найден в базе утечек ${pwned.count} раз. Это делает его крайне уязвимым.`
-      : 'ФАКТ: Пароль не найден в базах утечек.';
+      ? `Утечки: найден ${pwned.count} раз. Это критично.`
+      : 'Утечки: не найден в базах.';
 
     const userPrompt = `
-Проведи экспертный разбор пароля: "${password}"
+ОБЪЕКТ: "${password}"
+ДАННЫЕ: длина ${localSignals.length}, уникальность ${localSignals.uniqueChars}, ${leakStatus}, паттерны: ${localSignals.detectedPatterns.join(', ') || 'нет'}.
 
-ДАННЫЕ:
-- Длина: ${localSignals.length}
-- Уникальность: ${localSignals.uniqueChars}
-- ${leakStatus}
-- Паттерны: ${localSignals.detectedPatterns.join(', ') || 'не обнаружены'}
+ИНСТРУКЦИЯ (ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ):
+Проведи экспертный аудит этого пароля. 
+Сначала напиши оценку (0-100) и уровень риска.
+Затем напиши подробный анализ (2-3 предложения) и дай пару советов.
+Не повторяй мои инструкции в ответе. Пиши сразу по существу.
+Разделяй блоки текста пустыми строками.
 
-ТВОЯ ЗАДАЧА:
-1. Оценка и риск (одной строкой).
-2. Развернутый анализ (почему такая оценка, сильные и слабые стороны).
-3. Список из 2-3 конкретных советов.
-
-ВАЖНЫЕ ТРЕБОВАНИЯ:
-- ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ.
-- Разделяй каждый пункт ПУСТОЙ СТРОКОЙ.
-- Будь конкретным, пиши именно про этот пароль.
-- Общий объем — до 400 символов.
-
-Твой развернутый ответ:`.trim()
+ОТВЕТ НА РУССКОМ:`.trim()
 
     const MAX_RETRIES = 1
     let lastError
@@ -54,7 +45,7 @@ export class OpenAiCompatibleClient {
           body: JSON.stringify({
             model: this.model,
             messages: [
-              { role: 'system', content: this.passwordReviewPrompt },
+              { role: 'system', content: this.passwordReviewPrompt + " ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ." },
               { role: 'user', content: userPrompt },
             ],
           }),
