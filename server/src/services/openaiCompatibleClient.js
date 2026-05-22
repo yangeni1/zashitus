@@ -2,7 +2,7 @@ import { config } from '../config.js'
 import { getLocale } from '../locales/index.js'
 import { readLimitedJson } from './readLimitedResponse.js'
 
-const SYSTEM_GUARD = `You are a security expert. Answer in Russian.`.trim()
+const SYSTEM_GUARD = `You are a cybersecurity expert specializing in password cryptanalysis. Answer in Russian.`.trim()
 
 export class OpenAiCompatibleClient {
   constructor({ baseUrl, apiKey, model, passwordReviewPrompt, timeoutMs }) {
@@ -16,16 +16,22 @@ export class OpenAiCompatibleClient {
   }
 
   async reviewPassword({ password, localSignals, pwned }) {
-    // Уходим от слова JSON, просим просто текст по строкам
+    // Возвращаем семантический контекст в запрос
     const userPrompt = `
-Оцени безопасность пароля: "${password}"
-${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.count} раз.` : 'Пароль пока не найден в базах утечек.'}
+${this.passwordReviewPrompt}
 
-Ответь строго по этому шаблону (4 строки на русском):
+Объект анализа: "${password}"
+Технические метрики:
+- Символов: ${localSignals.length} (уникальных: ${localSignals.uniqueChars})
+- Утечки: ${pwned.isPwned ? `найден ${pwned.count} раз` : 'не обнаружен'}
+- Локальные паттерны: ${localSignals.detectedPatterns.join(', ') || 'не выявлены'}
+
+ЗАДАЧА: Проведи глубокий семантический анализ пароля (оцени логику, предсказуемость, клавиатурные сетки и возможные ассоциации). 
+Ответь СТРОГО по шаблону (4 строки, русский язык):
 ОЦЕНКА: (число от 0 до 100)
 РИСК: (одно слово: low, medium, high или critical)
-ИТОГ: (одно предложение)
-СОВЕТЫ: (максимум 3 совета через запятую)
+ИТОГ: (одно емкое предложение с глубоким разбором семантики)
+СОВЕТЫ: (3 конкретных совета через запятую)
 
 Твой ответ:`.trim()
 
@@ -42,7 +48,7 @@ ${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.co
           },
           body: JSON.stringify({
             model: this.model,
-            temperature: 0.1,
+            temperature: 0.3, // Чуть поднял для лучшей семантики, но не слишком высоко
             messages: [
               { role: 'system', content: SYSTEM_GUARD },
               { role: 'user', content: userPrompt },
@@ -79,7 +85,7 @@ ${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.co
   parseTextResponse(content) {
     console.log('[AI] Raw content for parsing:', content);
 
-    // Если она всё еще пишет SELECT, попробуем вытащить данные регулярками
+    // Извлекаем данные, игнорируя возможный мусор или SQL-обертки
     const scoreMatch = content.match(/ОЦЕНКА:\s*(\d+)/i) || content.match(/(\d+)/)
     const riskMatch = content.match(/РИСК:\s*(low|medium|high|critical)/i) || content.match(/(low|medium|high|critical)/i)
     const summaryMatch = content.match(/ИТОГ:\s*([^\n]+)/i)
@@ -87,16 +93,22 @@ ${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.co
 
     const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50
     const riskLevel = riskMatch ? riskMatch[1].toLowerCase() : 'medium'
-    const summary = summaryMatch ? summaryMatch[1].trim() : 'Требуется улучшение безопасности.'
-    const recommendations = adviceMatch 
-        ? adviceMatch[1].split(',').map(s => s.trim()).filter(Boolean)
-        : []
+    const summary = summaryMatch ? summaryMatch[1].trim() : 'Требуется более сложная структура пароля.'
+    
+    // Обработка советов: если они через запятую, делим, иначе берем как есть
+    let recommendations = []
+    if (adviceMatch) {
+      const rawAdvice = adviceMatch[1].trim()
+      recommendations = rawAdvice.includes(',') 
+        ? rawAdvice.split(',').map(s => s.trim()) 
+        : [rawAdvice]
+    }
 
     const normalized = {
       score: Math.min(100, Math.max(0, score)),
       riskLevel: ['low', 'medium', 'high', 'critical'].includes(riskLevel) ? riskLevel : 'medium',
       summary: limitSentences(summary, 1),
-      recommendations: recommendations.slice(0, 3).map(r => limitSentences(r, 2)),
+      recommendations: recommendations.filter(Boolean).slice(0, 3).map(r => limitSentences(r, 2)),
     }
 
     return {
@@ -107,6 +119,7 @@ ${pwned.isPwned ? `Этот пароль уже был взломан ${pwned.co
 }
 
 function limitSentences(value, maxSentences) {
+  if (!value) return ''
   const sentences = value.match(/[^.!?]+[.!?]?/g) || [value]
   return sentences.slice(0, maxSentences).join(' ').replace(/\s+/g, ' ').trim()
 }
